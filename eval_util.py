@@ -141,6 +141,7 @@ def evaluate_detection_results_pascal_voc(result_lists,
         result_lists['detection_classes'][idx] - label_id_offset)
   per_class_ap, mean_ap, _, _, per_class_corloc, mean_corloc = (
       evaluator.evaluate())
+  print("mean_corloc", mean_corloc)
 
   metrics = {'Precision/mAP@{}IOU'.format(iou_thres): mean_ap}
   category_index = label_map_util.create_category_index(categories)
@@ -378,6 +379,7 @@ def run_checkpoint_once(tensor_dict,
   with tf.contrib.slim.queues.QueueRunners(sess):
     try:
       for batch in range(int(num_batches)):
+        print('batch %d', batch)
         if (batch + 1) % 100 == 0:
           logging.info('Running eval ops batch %d/%d', batch + 1, num_batches)
         if not batch_processor:
@@ -391,6 +393,7 @@ def run_checkpoint_once(tensor_dict,
         else:
           result_dict = batch_processor(
               tensor_dict, sess, batch, counters, update_op)
+          #print("tensor_dict", tensor_dict)
         for key in result_dict:
           if key in valid_keys:
             result_lists[key].append(result_dict[key])

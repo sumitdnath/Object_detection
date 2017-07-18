@@ -191,7 +191,27 @@ def evaluate(create_input_dict_fn, create_model_fn, eval_config, categories,
     latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
     saver.restore(sess, latest_checkpoint)
 
-  eval_util.repeated_checkpoint_run(
+
+
+#  eval_util.repeated_checkpoint_run(
+#      tensor_dict=tensor_dict,
+#      update_op=tf.no_op(),
+#      summary_dir=eval_dir,
+#      aggregated_result_processor=_process_aggregated_results,
+#      batch_processor=_process_batch,
+#      checkpoint_dirs=[checkpoint_dir],
+#      variables_to_restore=None,
+#      restore_fn=_restore_latest_checkpoint,
+#      num_batches=eval_config.num_examples,
+#      eval_interval_secs=eval_config.eval_interval_secs,
+#      max_number_of_evaluations=(
+#          1 if eval_config.ignore_groundtruth else
+#          eval_config.max_evals if eval_config.max_evals else
+#          None),
+#      master=eval_config.eval_master,
+#      save_graph=eval_config.save_graph,
+#      save_graph_dir=(eval_dir if eval_config.save_graph else ''))
+  eval_util.run_checkpoint_once(
       tensor_dict=tensor_dict,
       update_op=tf.no_op(),
       summary_dir=eval_dir,
@@ -201,11 +221,6 @@ def evaluate(create_input_dict_fn, create_model_fn, eval_config, categories,
       variables_to_restore=None,
       restore_fn=_restore_latest_checkpoint,
       num_batches=eval_config.num_examples,
-      eval_interval_secs=0,#eval_config.eval_interval_secs,
-      max_number_of_evaluations=1,#(
-          #1 if eval_config.ignore_groundtruth else
-          #eval_config.max_evals if eval_config.max_evals else
-          #None),
       master=eval_config.eval_master,
       save_graph=eval_config.save_graph,
       save_graph_dir=(eval_dir if eval_config.save_graph else ''))

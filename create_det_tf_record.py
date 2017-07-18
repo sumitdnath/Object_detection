@@ -38,12 +38,12 @@ from utils import dataset_util
 from utils import label_map_util
 
 flags = tf.app.flags
-flags.DEFINE_string('data_dir', '/data2/imagenet/VID/train/ILSVRC', 'Root directory to raw VID dataset.')
+flags.DEFINE_string('data_dir', '/data2/imagenet/DET/ILSVRC2015/Data/DET/train', 'Root directory to raw VID dataset.')
 flags.DEFINE_string('set', 'train', 'Convert training set, validation set or '
                     'merged set.')
 flags.DEFINE_string('annotations_dir', 'Annotations',
                     '(Relative) path to annotations directory.')
-flags.DEFINE_string('output_path', '/data2/imagenet/VID/TF/train_tf', 'Path to output TFRecord')
+flags.DEFINE_string('output_path', '/data2/imagenet/DET/TF/train_tf', 'Path to output TFRecord')
 flags.DEFINE_string('label_map_path', 'data/vid_local_map.pbtxt',
                     'Path to label map proto')
 FLAGS = flags.FLAGS
@@ -54,8 +54,7 @@ SETS = ['train', 'val', 'test']
 def dict_to_tf_example(data,
                        dataset_directory,
                        label_map_dict,
-                       setname = 'train',
-                       num_label=[]):
+                       setname = 'train'):
   """Convert XML derived dict to tf.Example proto.
 
   Notice that this function normalizes the bounding box coordinates provided
@@ -114,7 +113,6 @@ def dict_to_tf_example(data,
         trackid.append(int(obj['trackid']))
         occluded.append(int(obj['occluded']))
         generated.append(int(obj['generated']))
-        num_label[int(label_map_dict[obj['name']])] += 1
 
   example = tf.train.Example(features=tf.train.Features(feature={
       'image/height': dataset_util.int64_feature(height),
@@ -155,23 +153,19 @@ def main(_):
 
   logging.info('Reading from VID dataset.')
   examples_path = os.path.join(data_dir,'ImageSets', 'VID','list'
-                               ,FLAGS.set + '_5%_list.txt')
+                               ,FLAGS.set + '_list.txt')
   annotations_dir = os.path.join(data_dir, FLAGS.annotations_dir, 'VID', FLAGS.set)
   examples_list = dataset_util.read_examples_list(examples_path)
-
-  num_label = [0] * 31
   for idx, example in enumerate(examples_list):
     if idx % 100 == 0:
       logging.info('On image %d of %d', idx, len(examples_list))
-    if int(idx) %100 ==0:
-      print (idx, num_label)
     path = os.path.join(annotations_dir, example)
     with tf.gfile.GFile(path, 'r') as fid:
       xml_str = fid.read()
     xml = etree.fromstring(xml_str)
     data = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
     tf_example = dict_to_tf_example(data, FLAGS.data_dir, label_map_dict,
-                                    FLAGS.set, num_label)
+                                    FLAGS.set)
     writer.write(tf_example.SerializeToString())
 
   writer.close()
