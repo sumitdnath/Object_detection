@@ -163,6 +163,7 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
 
   with tf.Graph().as_default():
     # Build a configuration specifying multi-GPU and multi-replicas.
+
     deploy_config = model_deploy.DeploymentConfig(
         num_clones=num_clones,
         clone_on_cpu=clone_on_cpu,
@@ -268,6 +269,7 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
     # Soft placement allows placing on CPU ops without GPU implementation.
     session_config = tf.ConfigProto(allow_soft_placement=True,
                                     log_device_placement=False)
+    session_config.gpu_options.allow_growth = True
 
     # Save checkpoints regularly.
     keep_checkpoint_every_n_hours = train_config.keep_checkpoint_every_n_hours

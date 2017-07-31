@@ -47,6 +47,8 @@ import functools
 import tensorflow as tf
 import logging
 
+import sys
+sys.path.append("/home/wangshiyao/Documents/workspace/VID/object_detection")
 from google.protobuf import text_format
 from object_detection import evaluator
 from object_detection.builders import input_reader_builder

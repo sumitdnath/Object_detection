@@ -46,6 +46,8 @@ import json
 import os
 import tensorflow as tf
 
+import sys
+sys.path.append("/home/wangshiyao/Documents/workspace/VID/object_detection")
 from google.protobuf import text_format
 
 from object_detection import trainer
@@ -191,6 +193,7 @@ def main(_):
     is_chief = (task_info.type == 'master')
     master = server.target
 
+  print ('enter trainer soon!!!')
   trainer.train(create_input_dict_fn, model_fn, train_config, master, task,
                 FLAGS.num_clones, worker_replicas, FLAGS.clone_on_cpu, ps_tasks,
                 worker_job_name, is_chief, FLAGS.train_dir)
