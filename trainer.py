@@ -68,7 +68,6 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn,
   if data_augmentation_options:
     tensor_dict = preprocessor.preprocess(tensor_dict,
                                           data_augmentation_options)
-
   input_queue = batcher.BatchQueue(
       tensor_dict,
       batch_size=batch_size_per_clone,
@@ -105,6 +104,7 @@ def _get_inputs(input_queue, num_classes):
     classes_gt = util_ops.padded_one_hot_encoding(indices=classes_gt,
                                                   depth=num_classes, left_pad=0)
     masks_gt = read_data.get(fields.InputDataFields.groundtruth_instance_masks)
+    tf.add_to_collection("filename", read_data[fields.InputDataFields.filename])
     return image, location_gt, classes_gt, masks_gt
   return zip(*map(extract_images_and_targets, read_data_list))
 
@@ -184,10 +184,10 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
                                         train_config.prefetch_queue_capacity,
                                         data_augmentation_options)
 
+
     # Gather initial summaries.
     summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
     global_summaries = set([])
-
     model_fn = functools.partial(_create_losses,
                                  create_model_fn=create_model_fn)
     clones = model_deploy.create_clones(deploy_config, model_fn, [input_queue])
@@ -203,7 +203,7 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
 
     sync_optimizer = None
     if train_config.sync_replicas:
-      training_optimizer = tf.SyncReplicasOptimizer(
+      training_optimizer = tf.train.SyncReplicasOptimizer(
           training_optimizer,
           replicas_to_aggregate=train_config.replicas_to_aggregate,
           total_num_replicas=train_config.worker_replicas)
@@ -275,6 +275,7 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
     keep_checkpoint_every_n_hours = train_config.keep_checkpoint_every_n_hours
     saver = tf.train.Saver(
         keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
+
 
     slim.learning.train(
         train_tensor,
