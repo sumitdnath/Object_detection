@@ -159,16 +159,19 @@ def main(_):
   label_map_dict = label_map_util.get_label_map_dict(FLAGS.label_map_path)
 
   logging.info('Reading dataset.')
-  examples_path = '/home/wangshiyao/Documents/data/imagenet/gen_list/combine_train_list.txt'
+  examples_path = '/home/wangshiyao/Documents/data/imagenet/gen_list/balance_list.txt'
   annotations_dir = '/home/wangshiyao/Documents/data/imagenet/'
   examples_list = dataset_util.read_examples_list(examples_path)
 
   num_label = [0] * 31
+  per_tf = 100
   for idx, example in enumerate(examples_list):
     if idx % 100 == 0:
       logging.info('On image %d of %d', idx, len(examples_list))
     if int(idx) %100 ==0:
-      print (idx, num_label)
+        writer = tf.python_io.TFRecordWriter(FLAGS.output_path+'_'+str(int(idx/100)))
+        print (num_label)
+
     path = os.path.join(annotations_dir, example)
     with tf.gfile.GFile(path, 'r') as fid:
       xml_str = fid.read()
@@ -176,7 +179,7 @@ def main(_):
     data = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
     tf_example = dict_to_tf_example(data, example, FLAGS.data_dir, label_map_dict,
                                     FLAGS.set, num_label)
-    #writer.write(tf_example.SerializeToString())
+    writer.write(tf_example.SerializeToString())
 
   writer.close()
 
