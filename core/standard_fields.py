@@ -53,8 +53,10 @@ class InputDataFields(object):
     groundtruth_label_scores: groundtruth label scores.
   """
   image = 'image'
+  flow_image = 'flow_image'
   original_image = 'original_image'
   key = 'key'
+  flow_key = 'flow_key'
   source_id = 'source_id'
   filename = 'filename'
   groundtruth_image_classes = 'groundtruth_image_classes'
@@ -127,7 +129,9 @@ class TfExampleFields(object):
     instance_classes: Classes for each instance segmentation mask.
   """
   image_encoded = 'image/encoded'
+  image_flow_encoded = 'image/flow_encoded'
   image_format = 'image/format'  # format is reserved keyword
+  image_flow_format = 'image/flow_format'  # format is reserved keyword
   filename = 'image/filename'
   channels = 'image/channels'
   colorspace = 'image/colorspace'

@@ -33,9 +33,12 @@ class TfExampleDecoder(data_decoder.DataDecoder):
     """Constructor sets keys_to_features and items_to_handlers."""
     self.keys_to_features = {
         'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
+        'image/flow_encoded': tf.FixedLenFeature((), tf.string, default_value=''),
         'image/format': tf.FixedLenFeature((), tf.string, default_value='jpeg'),
+        'image/flow_format': tf.FixedLenFeature((), tf.string, default_value='png'),
         'image/filename': tf.FixedLenFeature((), tf.string, default_value=''),
         'image/key/sha256': tf.FixedLenFeature((), tf.string, default_value=''),
+        'image/flow_key/sha256': tf.FixedLenFeature((), tf.string, default_value=''),
         'image/source_id': tf.FixedLenFeature((), tf.string, default_value=''),
         'image/height': tf.FixedLenFeature((), tf.int64, 1),
         'image/width': tf.FixedLenFeature((), tf.int64, 1),
@@ -55,10 +58,14 @@ class TfExampleDecoder(data_decoder.DataDecoder):
     self.items_to_handlers = {
         fields.InputDataFields.image: slim_example_decoder.Image(
             image_key='image/encoded', format_key='image/format', channels=3),
+        fields.InputDataFields.flow_image: slim_example_decoder.Image(
+            image_key='image/flow_encoded', format_key='image/flow_format', channels=3),
         fields.InputDataFields.source_id: (
             slim_example_decoder.Tensor('image/source_id')),
         fields.InputDataFields.key: (
             slim_example_decoder.Tensor('image/key/sha256')),
+        fields.InputDataFields.flow_key: (
+            slim_example_decoder.Tensor('image/flow_key/sha256')),
         fields.InputDataFields.filename: (
             slim_example_decoder.Tensor('image/filename')),
         # Object boxes and classes.
@@ -123,6 +130,7 @@ class TfExampleDecoder(data_decoder.DataDecoder):
     is_crowd = fields.InputDataFields.groundtruth_is_crowd
     tensor_dict[is_crowd] = tf.cast(tensor_dict[is_crowd], dtype=tf.bool)
     tensor_dict[fields.InputDataFields.image].set_shape([None, None, 3])
+    tensor_dict[fields.InputDataFields.flow_image].set_shape([None, None, 3])
     return tensor_dict
 
   def _reshape_instance_masks(self, keys_to_tensors):

@@ -112,7 +112,7 @@ class FasterRCNNFeatureExtractor(object):
     """Feature-extractor specific preprocessing (minus image resizing)."""
     pass
 
-  def extract_proposal_features(self, preprocessed_inputs, scope):
+  def extract_proposal_features(self, preprocessed_inputs, preprocessed_flow, scope):
     """Extracts first stage RPN features.
 
     This function is responsible for extracting feature maps from preprocessed
@@ -127,8 +127,8 @@ class FasterRCNNFeatureExtractor(object):
     Returns:
       rpn_feature_map: A tensor with shape [batch, height, width, depth]
     """
-    with tf.variable_scope(scope, values=[preprocessed_inputs]):
-      return self._extract_proposal_features(preprocessed_inputs, scope)
+    with tf.variable_scope(scope, values=[preprocessed_inputs, preprocessed_flow]):
+      return self._extract_proposal_features(preprocessed_inputs, preprocessed_flow, scope)
 
   @abstractmethod
   def _extract_proposal_features(self, preprocessed_inputs, scope):
@@ -156,6 +156,7 @@ class FasterRCNNFeatureExtractor(object):
   def _extract_box_classifier_features(self, proposal_feature_maps, scope):
     """Extracts second stage box classifier features, to be overridden."""
     pass
+
 
   def restore_from_classification_checkpoint_fn(
       self,
@@ -189,7 +190,47 @@ class FasterRCNNFeatureExtractor(object):
     def restore(sess):
       saver.restore(sess, checkpoint_path)
     return restore
-
+#  def restore_from_classification_checkpoint_fn(
+#      self,
+#      checkpoint_path,
+#      first_stage_feature_extractor_scope,
+#      second_stage_feature_extractor_scope):
+#    """Returns callable for loading a checkpoint into the tensorflow graph.
+#
+#    Args:
+#      checkpoint_path: path to checkpoint to restore.
+#      first_stage_feature_extractor_scope: A scope name for the first stage
+#        feature extractor.
+#      second_stage_feature_extractor_scope: A scope name for the second stage
+#        feature extractor.
+#
+#    Returns:
+#      a callable which takes a tf.Session as input and loads a checkpoint when
+#        run.
+#    """
+#    variables_to_restore = {}
+#    for variable in tf.global_variables():
+#      for scope_name in [first_stage_feature_extractor_scope,
+#                         second_stage_feature_extractor_scope]:
+#        if variable.op.name.startswith(scope_name) and '/flow' in variable.op.name:
+#          var_name = variable.op.name.replace(scope_name + '/', '').replace('/flow', '')
+#          variables_to_restore[var_name] = variable
+#        else:
+#          variables_to_restore[variable.op.name] = variable
+#    per_checkpoint_path = checkpoint_path.split(',')
+#    variables_to_restore1 = \
+#        variables_helper.get_variables_available_in_checkpoint(
+#            variables_to_restore, per_checkpoint_path[0])
+#    variables_to_restore2 = \
+#         variables_helper.get_variables_available_in_checkpoint(
+#            variables_to_restore, per_checkpoint_path[1])
+#    saver = tf.train.Saver(variables_to_restore1)
+#    saver2 = tf.train.Saver(variables_to_restore2)
+#    def restore(sess):
+#      saver.restore(sess, per_checkpoint_path[0])
+#      saver2.restore(sess, per_checkpoint_path[1])
+#    return restore
+#
 
 class FasterRCNNMetaArch(model.DetectionModel):
   """Faster R-CNN Meta-architecture definition."""
@@ -450,7 +491,7 @@ class FasterRCNNMetaArch(model.DetectionModel):
                                  parallel_iterations=self._parallel_iterations)
       return self._feature_extractor.preprocess(resized_inputs)
 
-  def predict(self, preprocessed_inputs):
+  def predict(self, preprocessed_inputs, preprocessed_flow):
     """Predicts unpostprocessed tensors from input tensor.
 
     This function takes an input batch of images and runs it through the
@@ -518,7 +559,7 @@ class FasterRCNNMetaArch(model.DetectionModel):
           containing instance mask predictions.
     """
     (rpn_box_predictor_features, rpn_features_to_crop, anchors_boxlist,
-     image_shape) = self._extract_rpn_feature_maps(preprocessed_inputs)
+     image_shape) = self._extract_rpn_feature_maps(preprocessed_inputs, preprocessed_flow)
     (rpn_box_encodings, rpn_objectness_predictions_with_background
     ) = self._predict_rpn_proposals(rpn_box_predictor_features)
 
@@ -633,7 +674,7 @@ class FasterRCNNMetaArch(model.DetectionModel):
     }
     return prediction_dict
 
-  def _extract_rpn_feature_maps(self, preprocessed_inputs):
+  def _extract_rpn_feature_maps(self, preprocessed_inputs, preprocessed_flow):
     """Extracts RPN features.
 
     This function extracts two feature maps: a feature map to be directly
@@ -657,7 +698,7 @@ class FasterRCNNMetaArch(model.DetectionModel):
     """
     image_shape = tf.shape(preprocessed_inputs)
     rpn_features_to_crop = self._feature_extractor.extract_proposal_features(
-        preprocessed_inputs, scope=self.first_stage_feature_extractor_scope)
+        preprocessed_inputs, preprocessed_flow, scope=self.first_stage_feature_extractor_scope)
 
     feature_map_shape = tf.shape(rpn_features_to_crop)
     anchors = self._first_stage_anchor_generator.generate(

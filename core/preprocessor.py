@@ -237,6 +237,7 @@ def _flip_masks(masks):
 
 def random_horizontal_flip(
     image,
+    flow_image,
     boxes=None,
     masks=None,
     keypoints=None,
@@ -289,7 +290,7 @@ def random_horizontal_flip(
     raise ValueError(
         'keypoints are provided but keypoints_flip_permutation is not provided')
 
-  with tf.name_scope('RandomHorizontalFlip', values=[image, boxes]):
+  with tf.name_scope('RandomHorizontalFlip', values=[image, flow_image, boxes]):
     result = []
     # random variable defining whether to do flip or not
     do_a_flip_random = tf.random_uniform([], seed=seed)
@@ -300,6 +301,10 @@ def random_horizontal_flip(
     # flip image
     image = tf.cond(do_a_flip_random, lambda: _flip_image(image), lambda: image)
     result.append(image)
+
+    # flip flow_image
+    flow_image = tf.cond(do_a_flip_random, lambda: _flip_image(flow_image), lambda: flow_image)
+    result.append(flow_image)
 
     # flip boxes
     if boxes is not None:
@@ -1772,6 +1777,7 @@ def get_default_func_arg_map(include_instance_masks=False,
   prep_func_arg_map = {
       normalize_image: (fields.InputDataFields.image,),
       random_horizontal_flip: (fields.InputDataFields.image,
+                               fields.InputDataFields.flow_image,
                                fields.InputDataFields.groundtruth_boxes,
                                groundtruth_instance_masks,
                                groundtruth_keypoints,),
@@ -1881,12 +1887,16 @@ def preprocess(tensor_dict, preprocess_options, func_arg_map=None):
 
   # changes the images to image (rank 4 to rank 3) since the functions
   # receive rank 3 tensor for image
-  if fields.InputDataFields.image in tensor_dict:
+  if fields.InputDataFields.image in tensor_dict and fields.InputDataFields.flow_image in tensor_dict:
     images = tensor_dict[fields.InputDataFields.image]
+    flow_images = tensor_dict[fields.InputDataFields.flow_image]
     if len(images.get_shape()) != 4:
       raise ValueError('images in tensor_dict should be rank 4')
     image = tf.squeeze(images, squeeze_dims=[0])
+    flow_image = tf.squeeze(flow_images, squeeze_dims=[0])
+
     tensor_dict[fields.InputDataFields.image] = image
+    tensor_dict[fields.InputDataFields.flow_image] = flow_image
 
   # Preprocess inputs based on preprocess_options
   for option in preprocess_options:
@@ -1918,4 +1928,8 @@ def preprocess(tensor_dict, preprocess_options, func_arg_map=None):
     images = tf.expand_dims(image, 0)
     tensor_dict[fields.InputDataFields.image] = images
 
+  if fields.InputDataFields.flow_image in tensor_dict:
+    flow_image = tensor_dict[fields.InputDataFields.flow_image]
+    flow_images = tf.expand_dims(flow_image, 0)
+    tensor_dict[fields.InputDataFields.flow_image] = flow_images
   return tensor_dict

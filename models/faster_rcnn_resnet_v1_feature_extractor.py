@@ -82,7 +82,7 @@ class FasterRCNNResnetV1FeatureExtractor(
     channel_means = [123.68, 116.779, 103.939]
     return resized_inputs - [[channel_means]]
 
-  def _extract_proposal_features(self, preprocessed_inputs, scope):
+  def _extract_proposal_features(self, preprocessed_inputs, preprocessed_flow, scope):
     """Extracts first stage RPN features.
 
     Args:
@@ -100,12 +100,20 @@ class FasterRCNNResnetV1FeatureExtractor(
     if len(preprocessed_inputs.get_shape().as_list()) != 4:
       raise ValueError('`preprocessed_inputs` must be 4 dimensional, got a '
                        'tensor of shape %s' % preprocessed_inputs.get_shape())
+
+    shape_assert = tf.Assert(
+        tf.logical_and(
+            tf.equal(tf.shape(preprocessed_inputs)[1], tf.shape(preprocessed_flow)[1]),
+            tf.equal(tf.shape(preprocessed_inputs)[2], tf.shape(preprocessed_flow)[2])),
+        ['image size must at least be 33 in both height and width.'])
     shape_assert = tf.Assert(
         tf.logical_and(
             tf.greater_equal(tf.shape(preprocessed_inputs)[1], 33),
             tf.greater_equal(tf.shape(preprocessed_inputs)[2], 33)),
         ['image size must at least be 33 in both height and width.'])
 
+    #tf.add_to_collection("shape_image", tf.shape(preprocessed_inputs)[1])
+    #tf.add_to_collection("shape_flow", tf.shape(preprocessed_flow)[1])
     with tf.control_dependencies([shape_assert]):
       # Disables batchnorm for fine-tuning with smaller batch sizes.
       # TODO: Figure out if it is needed when image batch size is bigger.
@@ -125,8 +133,20 @@ class FasterRCNNResnetV1FeatureExtractor(
               spatial_squeeze=False,
               scope=var_scope)
 
+        with tf.variable_scope(
+            self._architecture+'/flow', reuse=self._reuse_weights) as var_scope:
+          _, flow_activations = self._resnet_model(
+              preprocessed_flow,
+              num_classes=None,
+              is_training=False,
+              global_pool=False,
+              output_stride=self._first_stage_features_stride,
+              spatial_squeeze=False,
+              scope=var_scope)
+
     handle = scope + '/%s/block3' % self._architecture
-    return activations[handle]
+    handle_flow = scope + '/%s/block3' % (self._architecture+'/flow')
+    return tf.add(activations[handle], flow_activations[handle_flow])
 
   def _extract_box_classifier_features(self, proposal_feature_maps, scope):
     """Extracts second stage box classifier features.

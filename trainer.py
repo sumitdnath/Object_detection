@@ -61,13 +61,26 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn,
   tensor_dict[fields.InputDataFields.image] = tf.expand_dims(
       tensor_dict[fields.InputDataFields.image], 0)
 
+  tensor_dict[fields.InputDataFields.flow_image] = tf.expand_dims(
+      tensor_dict[fields.InputDataFields.flow_image], 0)
+
   images = tensor_dict[fields.InputDataFields.image]
   float_images = tf.to_float(images)
   tensor_dict[fields.InputDataFields.image] = float_images
 
+  tf.add_to_collection("image_shape", tf.shape(images))
+
+  flow_images = tensor_dict[fields.InputDataFields.flow_image]
+  float_flow_images = tf.to_float(flow_images)
+  tensor_dict[fields.InputDataFields.flow_image] = float_flow_images
+
+  tf.add_to_collection("flow_shape", tf.shape(flow_images))
+  tf.add_to_collection("filename", tensor_dict[fields.InputDataFields.filename])
   if data_augmentation_options:
     tensor_dict = preprocessor.preprocess(tensor_dict,
                                           data_augmentation_options)
+
+
   input_queue = batcher.BatchQueue(
       tensor_dict,
       batch_size=batch_size_per_clone,
@@ -97,6 +110,7 @@ def _get_inputs(input_queue, num_classes):
   label_id_offset = 1
   def extract_images_and_targets(read_data):
     image = read_data[fields.InputDataFields.image]
+    flow_image = read_data[fields.InputDataFields.flow_image]
     location_gt = read_data[fields.InputDataFields.groundtruth_boxes]
     classes_gt = tf.cast(read_data[fields.InputDataFields.groundtruth_classes],
                          tf.int32)
@@ -104,8 +118,7 @@ def _get_inputs(input_queue, num_classes):
     classes_gt = util_ops.padded_one_hot_encoding(indices=classes_gt,
                                                   depth=num_classes, left_pad=0)
     masks_gt = read_data.get(fields.InputDataFields.groundtruth_instance_masks)
-    tf.add_to_collection("filename", read_data[fields.InputDataFields.filename])
-    return image, location_gt, classes_gt, masks_gt
+    return image, flow_image, location_gt, classes_gt, masks_gt
   return zip(*map(extract_images_and_targets, read_data_list))
 
 
@@ -117,18 +130,23 @@ def _create_losses(input_queue, create_model_fn):
     create_model_fn: A function to create the DetectionModel.
   """
   detection_model = create_model_fn()
-  (images, groundtruth_boxes_list, groundtruth_classes_list,
+  (images, flow_images, groundtruth_boxes_list, groundtruth_classes_list,
    groundtruth_masks_list
   ) = _get_inputs(input_queue, detection_model.num_classes)
   images = [detection_model.preprocess(image) for image in images]
   images = tf.concat(images, 0)
+
+# preprocess for flow image
+  flow_images = [detection_model.preprocess(flow_image) for flow_image in flow_images]
+  flow_images = tf.concat(flow_images, 0)
+
   if any(mask is None for mask in groundtruth_masks_list):
     groundtruth_masks_list = None
 
   detection_model.provide_groundtruth(groundtruth_boxes_list,
                                       groundtruth_classes_list,
                                       groundtruth_masks_list)
-  prediction_dict = detection_model.predict(images)
+  prediction_dict = detection_model.predict(images,flow_images)
 
   losses_dict = detection_model.loss(prediction_dict)
   for loss_tensor in losses_dict.values():
@@ -256,6 +274,7 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
       global_summaries.add(tf.summary.scalar(loss_tensor.op.name, loss_tensor))
     global_summaries.add(
         tf.summary.scalar('TotalLoss', tf.losses.get_total_loss()))
+
 
     # Add the summaries from the first clone. These contain the summaries
     # created by model_fn and either optimize_clones() or _gather_clone_loss().
